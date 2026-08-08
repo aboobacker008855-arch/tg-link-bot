@@ -29,9 +29,15 @@ server = web.Application()
 async def root_handler(request):
     return web.Response(text="Bot is Running!", status=200)
 
-@routes.get("/download/{chat_id}/{message_id}")
 @routes.get("/watch/{chat_id}/{message_id}")
-async def stream_handler(request):
+async def watch_handler(request):
+    return await handle_stream(request, is_download=False)
+
+@routes.get("/download/{chat_id}/{message_id}")
+async def download_handler(request):
+    return await handle_stream(request, is_download=True)
+
+async def handle_stream(request, is_download=False):
     try:
         chat_id = int(request.match_info['chat_id'])
         message_id = int(request.match_info['message_id'])
@@ -45,9 +51,13 @@ async def stream_handler(request):
         file_name = getattr(media, "file_name", "Telegram_Video.mp4")
         file_size = getattr(media, "file_size", 0)
 
+        # Download ആണെങ്കിൽ 'attachment', Stream ആണെങ്കിൽ 'inline'
+        disposition = "attachment" if is_download else "inline"
+        content_type = "application/octet-stream" if is_download else "video/mp4"
+
         headers = {
-            'Content-Type': 'video/mp4',
-            'Content-Disposition': f'inline; filename="{file_name}"',
+            'Content-Type': content_type,
+            'Content-Disposition': f'{disposition}; filename="{file_name}"',
             'Content-Length': str(file_size),
             'Accept-Ranges': 'bytes',
             'Connection': 'keep-alive'
@@ -56,7 +66,6 @@ async def stream_handler(request):
         response = web.StreamResponse(status=200, headers=headers)
         await response.prepare(request)
 
-        # 1MB chunk size for fast streaming buffer
         async for chunk in app.stream_media(msg, limit=0):
             await response.write(chunk)
 
