@@ -1,1 +1,3 @@
-pyrogram\ntgcrypto\naiohttp
+pyrogram
+tgcrypto
+aiohttp
