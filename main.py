@@ -13,7 +13,7 @@ from aiohttp import web
 
 API_ID = int(os.environ.get("API_ID", "30758714"))
 API_HASH = os.environ.get("API_HASH", "32214e6bfbb651a4f64a707c775eca45")
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8588152483:AAGDpwdvhMGPwuIImeeoffhSU6fcA9maw3c")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8926177079:AAH5meh2Kwmk-pb7Mc16lWZ-HfDL1SUEYUk")
 PORT = int(os.environ.get("PORT", "8080"))
 
 DOMAIN = os.environ.get("RENDER_EXTERNAL_URL", "https://tg-link-bot-882m.onrender.com")
