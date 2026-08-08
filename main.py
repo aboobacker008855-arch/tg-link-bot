@@ -28,6 +28,24 @@ USER_CHAT_ID = None
 async def root_handler(request):
     return web.Response(text="Bot is Running!", status=200)
 
+@routes.get("/vlc/{message_id}")
+async def vlc_redirect(request):
+    message_id = request.match_info['message_id']
+    stream_url = f"{DOMAIN}/watch/{message_id}"
+    vlc_intent = f"vlc://{stream_url}"
+    html = f"""
+    <html>
+        <head>
+            <meta http-equiv="refresh" content="0;url={vlc_intent}" />
+        </head>
+        <body style="background-color: #121212; color: white; text-align: center; font-family: sans-serif; padding-top: 50px;">
+            <h2>Opening in VLC Player...</h2>
+            <p>If it doesn't open automatically, <a href="{vlc_intent}" style="color: #0088cc;">Click Here</a></p>
+        </body>
+    </html>
+    """
+    return web.Response(text=html, content_type='text/html')
+
 @routes.get("/download/{message_id}")
 @routes.get("/watch/{message_id}")
 async def stream_handler(request):
@@ -90,11 +108,9 @@ async def handle_file(client, message):
     size_mb = file_size_bytes / (1024 * 1024)
     file_size = f"{round(size_mb / 1024, 2)} GiB" if size_mb >= 1024 else f"{round(size_mb, 2)} MiB"
     
-    # URL നിർമ്മാണം
     stream_url = f"{DOMAIN}/watch/{message.id}"
     download_url = f"{DOMAIN}/download/{message.id}"
-    # VLC പ്രോട്ടോക്കോൾ ലിങ്ക്
-    vlc_url = f"vlc://{stream_url}"
+    vlc_url = f"{DOMAIN}/vlc/{message.id}"
     
     text = (
         f"__**Your Fast Link Generated!**__\n\n"
@@ -105,7 +121,6 @@ async def handle_file(client, message):
         f"Link Generated Using **Public Link Generator Bot**"
     )
     
-    # 3 ബട്ടണുകൾ ആഡ് ചെയ്തു
     reply_markup = InlineKeyboardMarkup(
         [
             [
