@@ -21,18 +21,21 @@ DOMAIN = os.environ.get("RENDER_EXTERNAL_URL", "https://tg-link-bot-882m.onrende
 app = Client("4gb_stream_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 routes = web.RouteTableDef()
 
-# Fast Stream Handler with High Chunk Size (1 MB)
-CHUNK_SIZE = 1024 * 1024  # 1 MB Chunk for High Speed Stream
+USER_CHAT_ID = None
+
+@routes.get("/")
+async def root_route_handler(request):
+    return web.Response(text="Bot Alive!", status=200)
 
 @routes.get("/download/{message_id}")
 @routes.get("/watch/{message_id}")
 async def stream_handler(request):
     try:
         message_id = int(request.match_info['message_id'])
-        chat_id = request.app.get('user_chat_id')
+        chat_id = request.app.get('user_chat_id') or USER_CHAT_ID
         
         if not chat_id:
-            return web.Response(text="Chat ID missing. Resend the file to Telegram bot.", status=400)
+            return web.Response(text="Chat ID missing. Resend file to bot.", status=400)
 
         msg = await app.get_messages(chat_id=chat_id, message_ids=message_id)
         media = msg.document or msg.video or msg.audio
@@ -54,7 +57,6 @@ async def stream_handler(request):
         response = web.StreamResponse(status=200, headers=headers)
         await response.prepare(request)
 
-        # High-Speed Chunk Streaming
         async for chunk in app.stream_media(msg):
             await response.write(chunk)
 
@@ -69,9 +71,11 @@ async def start_cmd(client, message):
 
 @app.on_message(filters.document | filters.video | filters.audio)
 async def handle_file(client, message):
-    status_msg = await message.reply_text("⏳ *Generating High Speed Link...*")
-    
+    global USER_CHAT_ID
+    USER_CHAT_ID = message.chat.id
     server['user_chat_id'] = message.chat.id
+    
+    status_msg = await message.reply_text("⏳ *Generating High Speed Link...*")
     
     media = message.document or message.video or message.audio
     file_name = getattr(media, "file_name", "Telegram_File")
@@ -104,7 +108,7 @@ async def handle_file(client, message):
 
 async def start_services():
     await app.start()
-    print("Bot Started Successfully with High Speed Streaming!")
+    print("Bot Started Successfully!")
     
     server.add_routes(routes)
     runner = web.AppRunner(server)
