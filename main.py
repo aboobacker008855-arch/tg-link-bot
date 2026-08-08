@@ -1,7 +1,6 @@
 import os
 import asyncio
 
-# Fix for Python 3.14 asyncio event loop issue in Pyrogram
 try:
     asyncio.get_event_loop()
 except RuntimeError:
@@ -37,7 +36,7 @@ async def stream_handler(request):
             return web.Response(text="Chat ID missing. Resend file to Telegram bot.", status=400)
 
         msg = await app.get_messages(chat_id=chat_id, message_ids=message_id)
-        media = msg.document or msg.video or msg.audio
+        media = msg.document or msg.video or msg.audio or msg.animation
         
         if not media:
             return web.Response(text="File not found.", status=404)
@@ -66,15 +65,15 @@ async def stream_handler(request):
 
 @app.on_message(filters.command("start"))
 async def start_cmd(client, message):
-    await message.reply_text("👋 **Public Link Generator Bot is Active!**")
+    await message.reply_text("👋 **Public Link Generator Bot is Active!**\n\nഎനിക്ക് ഏതെങ്കിലും ഫയലോ വീഡിയോയോ അയച്ചു തരൂ, ഞാൻ ഡൗൺലോഡ്/സ്ട്രീമിംഗ് ലിങ്ക് ഉണ്ടാക്കി തരാം!")
 
-@app.on_message(filters.document | filters.video | filters.audio)
+@app.on_message(filters.private & (filters.document | filters.video | filters.audio | filters.animation))
 async def handle_file(client, message):
     server['user_chat_id'] = message.chat.id
     status_msg = await message.reply_text("⏳ *Generating High Speed Link...*")
     
-    media = message.document or message.video or message.audio
-    file_name = getattr(media, "file_name", "Telegram_File")
+    media = message.document or message.video or message.audio or message.animation
+    file_name = getattr(media, "file_name", "Telegram_File.mkv")
     
     size_mb = media.file_size / (1024 * 1024)
     file_size = f"{round(size_mb / 1024, 2)} GiB" if size_mb >= 1024 else f"{round(size_mb, 2)} MiB"
@@ -86,8 +85,8 @@ async def handle_file(client, message):
         f"__**Your Fast Link Generated!**__\n\n"
         f"📁 **File Name:**\n`{file_name}`\n\n"
         f"📦 **File Size:** `{file_size}`\n\n"
-        f"For Updates related to bot -> @JANGO\n"
-        f"For any query/discussion -> @JANGO\n\n"
+        f"For Updates related to bot -> @myran13\n"
+        f"For any query/discussion -> @myran13\n\n"
         f"Link Generated Using **Public Link Generator Bot**"
     )
     
