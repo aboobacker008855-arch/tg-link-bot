@@ -90,8 +90,11 @@ async def handle_file(client, message):
     size_mb = file_size_bytes / (1024 * 1024)
     file_size = f"{round(size_mb / 1024, 2)} GiB" if size_mb >= 1024 else f"{round(size_mb, 2)} MiB"
     
+    # URL നിർമ്മാണം
     stream_url = f"{DOMAIN}/watch/{message.id}"
     download_url = f"{DOMAIN}/download/{message.id}"
+    # VLC പ്രോട്ടോക്കോൾ ലിങ്ക്
+    vlc_url = f"vlc://{stream_url}"
     
     text = (
         f"__**Your Fast Link Generated!**__\n\n"
@@ -102,10 +105,14 @@ async def handle_file(client, message):
         f"Link Generated Using **Public Link Generator Bot**"
     )
     
+    # 3 ബട്ടണുകൾ ആഡ് ചെയ്തു
     reply_markup = InlineKeyboardMarkup(
         [
             [
                 InlineKeyboardButton("🖥️ Watch", url=stream_url),
+                InlineKeyboardButton("🎬 VLC Play", url=vlc_url)
+            ],
+            [
                 InlineKeyboardButton("Download ⚡", url=download_url)
             ]
         ]
