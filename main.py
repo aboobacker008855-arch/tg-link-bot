@@ -36,13 +36,13 @@ async def stream_handler(request):
             return web.Response(text="Chat ID missing. Resend file to Telegram bot.", status=400)
 
         msg = await app.get_messages(chat_id=chat_id, message_ids=message_id)
-        media = msg.document or msg.video or msg.audio or msg.animation
+        media = msg.document or msg.video or msg.audio or msg.animation or msg.voice
         
         if not media:
             return web.Response(text="File not found.", status=404)
 
         file_name = getattr(media, "file_name", "Telegram_File.mkv")
-        file_size = media.file_size
+        file_size = getattr(media, "file_size", 0)
 
         headers = {
             'Content-Type': 'application/octet-stream',
@@ -63,19 +63,26 @@ async def stream_handler(request):
     except Exception as e:
         return web.Response(text=f"Streaming Error: {str(e)}", status=500)
 
-@app.on_message(filters.command("start"))
+@app.on_message(filters.command("start") & filters.private)
 async def start_cmd(client, message):
     await message.reply_text("👋 **Public Link Generator Bot is Active!**\n\nഎനിക്ക് ഏതെങ്കിലും ഫയലോ വീഡിയോയോ അയച്ചു തരൂ, ഞാൻ ഡൗൺലോഡ്/സ്ട്രീമിംഗ് ലിങ്ക് ഉണ്ടാക്കി തരാം!")
 
-@app.on_message(filters.private & (filters.document | filters.video | filters.audio | filters.animation))
+# Catch any media message sent to private chat
+@app.on_message(filters.private & ~filters.command(["start"]))
 async def handle_file(client, message):
+    media = message.document or message.video or message.audio or message.animation or message.voice
+    
+    if not media:
+        await message.reply_text("❌ ദയവായി ഏതെങ്കിലും **ഫയൽ/വീഡിയോ** മാത്രം അയക്കുക!")
+        return
+
     server['user_chat_id'] = message.chat.id
     status_msg = await message.reply_text("⏳ *Generating High Speed Link...*")
     
-    media = message.document or message.video or message.audio or message.animation
-    file_name = getattr(media, "file_name", "Telegram_File.mkv")
+    file_name = getattr(media, "file_name", "Telegram_Media.mkv")
+    file_size_bytes = getattr(media, "file_size", 0)
     
-    size_mb = media.file_size / (1024 * 1024)
+    size_mb = file_size_bytes / (1024 * 1024)
     file_size = f"{round(size_mb / 1024, 2)} GiB" if size_mb >= 1024 else f"{round(size_mb, 2)} MiB"
     
     stream_url = f"{DOMAIN}/watch/{message.id}"
