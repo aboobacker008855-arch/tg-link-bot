@@ -16,7 +16,11 @@ API_HASH = os.environ.get("API_HASH", "32214e6bfbb651a4f64a707c775eca45")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8926177079:AAH5meh2Kwmk-pb7Mc16lWZ-HfDL1SUEYUk")
 PORT = int(os.environ.get("PORT", "8080"))
 
-DOMAIN = os.environ.get("RENDER_EXTERNAL_URL", "https://tg-link-bot-882m.onrender.com")
+# Ensure clean domain string without trailing slash or duplicate protocol
+RAW_DOMAIN = os.environ.get("RENDER_EXTERNAL_URL", "https://tg-link-bot-882m.onrender.com")
+if not RAW_DOMAIN.startswith("http"):
+    RAW_DOMAIN = f"https://{RAW_DOMAIN}"
+DOMAIN = RAW_DOMAIN.rstrip('/')
 
 app = Client("4gb_stream_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 routes = web.RouteTableDef()
@@ -31,8 +35,9 @@ async def root_handler(request):
 @routes.get("/vlc/{message_id}")
 async def vlc_redirect(request):
     message_id = request.match_info['message_id']
-    stream_url = f"{DOMAIN}/watch/{message_id}"
-    vlc_intent = f"vlc://{stream_url}"
+    clean_stream_url = f"{DOMAIN}/watch/{message_id}".replace("https://", "").replace("http://", "")
+    vlc_intent = f"vlc://{clean_stream_url}"
+    
     html = f"""
     <html>
         <head>
