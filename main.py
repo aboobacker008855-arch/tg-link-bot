@@ -20,6 +20,9 @@ DOMAIN = os.environ.get("RENDER_EXTERNAL_URL", "https://tg-link-bot-882m.onrende
 
 app = Client("4gb_stream_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 routes = web.RouteTableDef()
+server = web.Application()
+
+USER_CHAT_ID = None
 
 @routes.get("/")
 async def root_handler(request):
@@ -30,7 +33,7 @@ async def root_handler(request):
 async def stream_handler(request):
     try:
         message_id = int(request.match_info['message_id'])
-        chat_id = request.app.get('user_chat_id')
+        chat_id = request.app.get('user_chat_id') or USER_CHAT_ID
         
         if not chat_id:
             return web.Response(text="Chat ID missing. Resend file to Telegram bot.", status=400)
@@ -67,16 +70,18 @@ async def stream_handler(request):
 async def start_cmd(client, message):
     await message.reply_text("👋 **Public Link Generator Bot is Active!**\n\nഎനിക്ക് ഏതെങ്കിലും ഫയലോ വീഡിയോയോ അയച്ചു തരൂ, ഞാൻ ഡൗൺലോഡ്/സ്ട്രീമിംഗ് ലിങ്ക് ഉണ്ടാക്കി തരാം!")
 
-# Catch any media message sent to private chat
 @app.on_message(filters.private & ~filters.command(["start"]))
 async def handle_file(client, message):
+    global USER_CHAT_ID
     media = message.document or message.video or message.audio or message.animation or message.voice
     
     if not media:
         await message.reply_text("❌ ദയവായി ഏതെങ്കിലും **ഫയൽ/വീഡിയോ** മാത്രം അയക്കുക!")
         return
 
+    USER_CHAT_ID = message.chat.id
     server['user_chat_id'] = message.chat.id
+    
     status_msg = await message.reply_text("⏳ *Generating High Speed Link...*")
     
     file_name = getattr(media, "file_name", "Telegram_Media.mkv")
@@ -112,7 +117,6 @@ async def main():
     await app.start()
     print("Pyrogram Started!")
     
-    server = web.Application()
     server['user_chat_id'] = None
     server.add_routes(routes)
     
