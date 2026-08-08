@@ -25,8 +25,6 @@ app = Client("4gb_stream_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_T
 routes = web.RouteTableDef()
 server = web.Application()
 
-USER_CHAT_ID = None
-
 @routes.get("/")
 async def root_handler(request):
     return web.Response(text="Bot is Running!", status=200)
@@ -47,7 +45,6 @@ async def stream_handler(request):
         file_name = getattr(media, "file_name", "Telegram_Video.mp4")
         file_size = getattr(media, "file_size", 0)
 
-        # Content-Type is video/mp4 for direct browser playback
         headers = {
             'Content-Type': 'video/mp4',
             'Content-Disposition': f'inline; filename="{file_name}"',
@@ -59,7 +56,8 @@ async def stream_handler(request):
         response = web.StreamResponse(status=200, headers=headers)
         await response.prepare(request)
 
-        async for chunk in app.stream_media(msg):
+        # 1MB chunk size for fast streaming buffer
+        async for chunk in app.stream_media(msg, limit=0):
             await response.write(chunk)
 
         return response
@@ -73,15 +71,11 @@ async def start_cmd(client, message):
 
 @app.on_message(filters.private & ~filters.command(["start"]))
 async def handle_file(client, message):
-    global USER_CHAT_ID
     media = message.document or message.video or message.audio or message.animation or message.voice
     
     if not media:
         await message.reply_text("❌ ദയവായി ഏതെങ്കിലും **ഫയൽ/വീഡിയോ** മാത്രം അയക്കുക!")
         return
-
-    USER_CHAT_ID = message.chat.id
-    server['user_chat_id'] = message.chat.id
     
     status_msg = await message.reply_text("⏳ *Generating High Speed Link...*")
     
@@ -121,7 +115,6 @@ async def main():
     await app.start()
     print("Pyrogram Started!")
     
-    server['user_chat_id'] = None
     server.add_routes(routes)
     
     runner = web.AppRunner(server)
