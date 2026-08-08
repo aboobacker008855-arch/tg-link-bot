@@ -16,7 +16,6 @@ API_HASH = os.environ.get("API_HASH", "32214e6bfbb651a4f64a707c775eca45")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8926177079:AAH5meh2Kwmk-pb7Mc16lWZ-HfDL1SUEYUk")
 PORT = int(os.environ.get("PORT", "8080"))
 
-# Ensure clean domain string without trailing slash or duplicate protocol
 RAW_DOMAIN = os.environ.get("RENDER_EXTERNAL_URL", "https://tg-link-bot-882m.onrender.com")
 if not RAW_DOMAIN.startswith("http"):
     RAW_DOMAIN = f"https://{RAW_DOMAIN}"
@@ -32,34 +31,12 @@ USER_CHAT_ID = None
 async def root_handler(request):
     return web.Response(text="Bot is Running!", status=200)
 
-@routes.get("/vlc/{message_id}")
-async def vlc_redirect(request):
-    message_id = request.match_info['message_id']
-    clean_stream_url = f"{DOMAIN}/watch/{message_id}".replace("https://", "").replace("http://", "")
-    vlc_intent = f"vlc://{clean_stream_url}"
-    
-    html = f"""
-    <html>
-        <head>
-            <meta http-equiv="refresh" content="0;url={vlc_intent}" />
-        </head>
-        <body style="background-color: #121212; color: white; text-align: center; font-family: sans-serif; padding-top: 50px;">
-            <h2>Opening in VLC Player...</h2>
-            <p>If it doesn't open automatically, <a href="{vlc_intent}" style="color: #0088cc;">Click Here</a></p>
-        </body>
-    </html>
-    """
-    return web.Response(text=html, content_type='text/html')
-
-@routes.get("/download/{message_id}")
-@routes.get("/watch/{message_id}")
+@routes.get("/download/{chat_id}/{message_id}")
+@routes.get("/watch/{chat_id}/{message_id}")
 async def stream_handler(request):
     try:
+        chat_id = int(request.match_info['chat_id'])
         message_id = int(request.match_info['message_id'])
-        chat_id = request.app.get('user_chat_id') or USER_CHAT_ID
-        
-        if not chat_id:
-            return web.Response(text="Chat ID missing. Resend file to Telegram bot.", status=400)
 
         msg = await app.get_messages(chat_id=chat_id, message_ids=message_id)
         media = msg.document or msg.video or msg.audio or msg.animation or msg.voice
@@ -67,12 +44,13 @@ async def stream_handler(request):
         if not media:
             return web.Response(text="File not found.", status=404)
 
-        file_name = getattr(media, "file_name", "Telegram_File.mkv")
+        file_name = getattr(media, "file_name", "Telegram_Video.mp4")
         file_size = getattr(media, "file_size", 0)
 
+        # Content-Type is video/mp4 for direct browser playback
         headers = {
-            'Content-Type': 'application/octet-stream',
-            'Content-Disposition': f'attachment; filename="{file_name}"',
+            'Content-Type': 'video/mp4',
+            'Content-Disposition': f'inline; filename="{file_name}"',
             'Content-Length': str(file_size),
             'Accept-Ranges': 'bytes',
             'Connection': 'keep-alive'
@@ -107,15 +85,17 @@ async def handle_file(client, message):
     
     status_msg = await message.reply_text("⏳ *Generating High Speed Link...*")
     
-    file_name = getattr(media, "file_name", "Telegram_Media.mkv")
+    file_name = getattr(media, "file_name", "Telegram_Media.mp4")
     file_size_bytes = getattr(media, "file_size", 0)
     
     size_mb = file_size_bytes / (1024 * 1024)
     file_size = f"{round(size_mb / 1024, 2)} GiB" if size_mb >= 1024 else f"{round(size_mb, 2)} MiB"
     
-    stream_url = f"{DOMAIN}/watch/{message.id}"
-    download_url = f"{DOMAIN}/download/{message.id}"
-    vlc_url = f"{DOMAIN}/vlc/{message.id}"
+    chat_id = message.chat.id
+    msg_id = message.id
+    
+    stream_url = f"{DOMAIN}/watch/{chat_id}/{msg_id}"
+    download_url = f"{DOMAIN}/download/{chat_id}/{msg_id}"
     
     text = (
         f"__**Your Fast Link Generated!**__\n\n"
@@ -129,10 +109,7 @@ async def handle_file(client, message):
     reply_markup = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("🖥️ Watch", url=stream_url),
-                InlineKeyboardButton("🎬 VLC Play", url=vlc_url)
-            ],
-            [
+                InlineKeyboardButton("🖥️ Watch Direct", url=stream_url),
                 InlineKeyboardButton("Download ⚡", url=download_url)
             ]
         ]
