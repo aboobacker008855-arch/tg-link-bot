@@ -37,16 +37,18 @@ async def check_joined(client, user_id):
     if not UPDATE_CHANNEL:
         return True
     try:
-        chat_id = int(UPDATE_CHANNEL) if (UPDATE_CHANNEL.startswith("-100") or UPDATE_CHANNEL.lstrip('-').isdigit()) else UPDATE_CHANNEL
+        raw_ch = str(UPDATE_CHANNEL).strip()
+        chat_id = int(raw_ch) if (raw_ch.startswith("-100") or raw_ch.lstrip('-').isdigit()) else raw_ch
         sub = await client.get_chat_member(chat_id, user_id)
-        if sub.status in ["banned"]:
+        if sub.status in ["banned", "left"]:
             return False
         return True
     except UserNotParticipant:
         return False
     except Exception as e:
         print(f"FSUB Check Error: {e}")
-        return False
+        # Bot is not admin or valid error -> fallback to allow user
+        return True
 
 def get_fsub_markup():
     return InlineKeyboardMarkup([
