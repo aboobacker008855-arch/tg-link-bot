@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher, F, Router
+from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.enums import ParseMode
@@ -41,13 +41,27 @@ if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     ai_model = genai.GenerativeModel("gemini-pro")
 
-def menu():
+def start_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="Help 💡", callback_data="help"),
                 InlineKeyboardButton(text="About ℹ️", callback_data="about"),
                 InlineKeyboardButton(text="Close ❌", callback_data="close")
+            ]
+        ]
+    )
+
+# 'Back' ഉം 'Close' ഉം മുകളിലും, 'Comments 📝' തൊട്ടു താഴെയുമുള്ള ഹെൽപ്പ് മെനു
+def help_menu():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Back 🔙", callback_data="back_to_home"),
+                InlineKeyboardButton(text="Close ❌", callback_data="close")
+            ],
+            [
+                InlineKeyboardButton(text="Comments 📝", callback_data="bot_comments")
             ]
         ]
     )
@@ -78,15 +92,15 @@ async def start_cmd(message: Message):
         "WARNING ⚠️\n"
         "🔞 Adult content leads to a permanent ban."
     )
-    await message.answer(welcome_text, reply_markup=menu())
+    await message.answer(welcome_text, reply_markup=start_menu())
 
 @dp.message(Command("help"))
 async def help_cmd(message: Message):
-    await message.answer(help_text(), reply_markup=menu())
+    await message.answer(help_text(), reply_markup=help_menu())
 
 @dp.message(Command("about"))
 async def about_cmd(message: Message):
-    await message.answer(about_text(), reply_markup=menu())
+    await message.answer(about_text(), reply_markup=start_menu())
 
 @dp.message(Command("ai"))
 async def ai_chat(message: Message):
@@ -137,16 +151,7 @@ async def myfiles(message: Message):
 
 @dp.callback_query(F.data == "help")
 async def help_cb(c: CallbackQuery):
-    help_markup_with_comments = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="💬 Comments", callback_data="bot_comments"),
-                InlineKeyboardButton(text="About ℹ️", callback_data="about"),
-                InlineKeyboardButton(text="Close ❌", callback_data="close")
-            ]
-        ]
-    )
-    await c.message.edit_text(help_text(), reply_markup=help_markup_with_comments)
+    await c.message.edit_text(help_text(), reply_markup=help_menu())
     await c.answer()
 
 @dp.callback_query(F.data == "bot_comments")
@@ -171,9 +176,21 @@ async def comments_callback(c: CallbackQuery):
     await c.message.edit_text(text=comment_text, reply_markup=features_markup)
     await c.answer()
 
+@dp.callback_query(F.data == "back_to_home")
+async def back_to_home_cb(c: CallbackQuery):
+    welcome_text = (
+        f"👋 Hey, <b>{c.from_user.first_name}</b>\n\n"
+        "<i>I'm Telegram Files Streaming Bot as well as a Direct Links Generator</i>\n\n"
+        "Click on Help to get more information\n\n"
+        "WARNING ⚠️\n"
+        "🔞 Adult content leads to a permanent ban."
+    )
+    await c.message.edit_text(welcome_text, reply_markup=start_menu())
+    await c.answer()
+
 @dp.callback_query(F.data == "about")
 async def about_cb(c: CallbackQuery):
-    await c.message.edit_text(about_text(), reply_markup=menu())
+    await c.message.edit_text(about_text(), reply_markup=start_menu())
     await c.answer()
 
 @dp.callback_query(F.data == "close")
