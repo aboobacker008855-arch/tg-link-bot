@@ -25,7 +25,7 @@ SHORTENER_URL = os.environ.get("SHORTENER_URL", "")
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    ai_model = genai.GenerativeModel('gemini-2.0-flash')
+    ai_model = genai.GenerativeModel('gemini-1.5-flash')
 
 RAW_DOMAIN = os.environ.get("RENDER_EXTERNAL_URL", "https://tg-link-bot-882m.onrender.com")
 if not RAW_DOMAIN.startswith("http"):

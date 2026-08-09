@@ -1,5 +1,6 @@
 pyrogram
 tgcrypto
 aiohttp
+google-generativeai
 google-genai
 requests
