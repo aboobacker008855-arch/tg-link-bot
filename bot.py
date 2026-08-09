@@ -48,16 +48,18 @@ def start_menu():
                 InlineKeyboardButton(text="Help 💡", callback_data="help"),
                 InlineKeyboardButton(text="About ℹ️", callback_data="about"),
                 InlineKeyboardButton(text="Close ❌", callback_data="close")
+            ],
+            [
+                InlineKeyboardButton(text="📢 Bot Channel", url="https://t.me/your_channel_link")
             ]
         ]
     )
 
-# 'Back' ഉം 'Close' ഉം മുകളിലും, 'Comments 📝' തൊട്ടു താഴെയുമുള്ള ഹെൽപ്പ് മെനു
 def help_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="Back 🔙", callback_data="back_to_home"),
+                InlineKeyboardButton(text="🔙 Back", callback_data="back_to_home"),
                 InlineKeyboardButton(text="Close ❌", callback_data="close")
             ],
             [
