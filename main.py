@@ -10,11 +10,13 @@ import sqlite3
 from pathlib import Path
 from urllib.parse import quote
 import secrets
+from aiohttp import web
 
 TOKEN = os.getenv("BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://localhost:8080")
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "500"))
+PORT = int(os.getenv("PORT", "10000"))
 
 STORAGE_DIR = Path("storage")
 STORAGE_DIR.mkdir(exist_ok=True)
@@ -232,7 +234,20 @@ async def process_file(message: Message):
         disable_web_page_preview=True
     )
 
+# Web server to satisfy Render port binding requirement
+async def handle(request):
+    return web.Response(text="Bot is running!")
+
+async def web_server():
+    app = web.Application()
+    app.router.add_get("/", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+
 async def main():
+    await web_server()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
