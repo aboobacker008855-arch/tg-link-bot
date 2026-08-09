@@ -1,0 +1,89 @@
+port asyncio
+imort os
+import secrets
+import sqlite3
+fro pathlib import Path
+from urllib.parse import quote
+import aiofilesfrom aiogram import Bot, Dispatcher, F
+fromaiogram.filters import Command, CommandStart
+from aiogram.types import CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from dotenv import load_dotenv
+from FastAPI, HTTPException
+from fastapi.responses import FileResponse
+im
+
+BOT_TOKEN = os.geten("BOT_TOKEN", "")
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")CHANNEL_URL = os.getenv("CHANNEL_URL", "https://t.me/")
+STORAGE_DIR = Path(os.getenv("STORAGE_DIR", "./storage"))
+MX_FILE_SIZE_MB = intos.getenv("MAX_FILE_SIZE_MB", "20"))
+ADMIN_IDS = {int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()
+if not BOT_TOKEN:
+    raise RuntimeError("BOT_TOKEN is missing in .env")
+if not PUBLIC_BASE_UR
+    raise RuntimeError("PUBLIC_BASE_URLis missing in .env")
+
+STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+DB = sqlite3.connect("bot.db", check_same_thread=False)
+DB.execute("""CREATETABLE IF NOT EXISTS files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT
+   user_id INTEGER NOT NULL,
+    original_name TEXT NOT NULL,
+    stored_name TEXT NOT     size INTEGER NOT NULL
+)"""
+DB.execute("""CREATE TABLE IF NOT EXISTS usersd INTEGER PRIMARY KEY
+)""")
+DB.commit(
+
+app = FastAPI(title="Telgram Public Link 
+dp = Dispatcher(
+def menu():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        
+            InlineKeyboardButton(text="Help", callback_data="help"),
+           InlieKeyboardButton(text="About", callback_data="about"),
+            InlineKeyboardButton(text="Close", callback_data="close"),
+        ],
+        [InlneeyboardButton(text="📢 Bot Channel", url=CHANNEL_URL)]
+ elp_text
+    retn (
+        "📚 <b>Help</b>\n\n"
+        "Sendme a document, photo, audio or video. I will save it on the server "
+       "and return an externally downloadable HTTP link.\n\n"
+        "Commands:\n"
+        "• /start — start bot\n"
+       "• /myfiles — your generated links\n"
+        "• /he      "• /about — about bot\n\n"
+      f"⚠️ Current template download limit: {MAX_FILE_SIZE
+
+def about_text():
+   return 
+        "ℹ️ <b>About</b>\n\n"
+        "Telegram Files Streaming Bot + Direct Links Generator.\n\n"
+       "Only upload files you own or have permission to distribute."
+    )
+
+@dp.messae(CommandStart())async def start(message: Message):
+    D.execute("INSGNORE INTO users(user_id) VALUES (?)", (message.from_user.id,))
+    DB.commit()
+    name= message.from_user.first_name or "there"
+    await message.answer(
+       "👋 Hey, <b>{name}</b>!\n\n"
+        "I'm a Telgram Files Streaming Bot as well as a Direct Links Generator.\n\n"
+       "Click on Help to get more information.\n\n"
+       "⚠️ <b>WARNING</b>\n"
+       "🔞 Adult content is not supported in this templa       )
+
+@dp.message(Command("help")
+async def help_cmd(message: Message):
+    await message.answer(help_text(), reply_markup=menu())
+
+dp.message(Command("about"))
+async def about_cmd(messag: Message):
+    await messageanswer(about_text(), reply_markup=menu())
+
+@dp.message(Command("myfiles"))
+async def myfiles(message Message):
+    rows cute
+        "SELECT original_name, stored_name, size FROM files WHERE user_id=? ORDER BY id DESC LIMIT 20",
+       (messge.from_user.id,)
+    ).fetchall(
