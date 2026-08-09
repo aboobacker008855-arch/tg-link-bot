@@ -43,9 +43,10 @@ async def check_joined(client, user_id):
         return True
     except UserNotParticipant:
         return False
-    except Exception:
-        # If bot is not admin or any api limit issue, allow user to avoid blocking genuine users
-        return True
+    except Exception as e:
+        # Private channel api error -> default to False so force sub appears if check fails
+        print(f"FSUB Error: {e}")
+        return False
 
 def get_fsub_markup():
     return InlineKeyboardMarkup([
