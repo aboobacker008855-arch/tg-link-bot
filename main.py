@@ -86,7 +86,7 @@ async def start_cmd(client, message):
         "📁 **File Features:**\n"
         "എനിക്ക് ഏതെങ്കിലും ഫയലോ വീഡിയോയോ അയച്ചു തരൂ, ഞാൻ Fast Stream / Download ലിങ്ക് ഉണ്ടാക്കി തരാം!\n\n"
         "🤖 **AI Features:**\n"
-        "• `/ai [ചോദ്യം]` - AI-യോട് എന്തും ചോദിക്കാം (Free AI)\n"
+        "• `/ai [ചോദ്യം]` - AI-യോട് എന്തും ചോദിക്കാം (Free Fast AI)\n"
         "• `/generate [image prompt]` - AI ചിത്രങ്ങൾ ഉണ്ടാക്കാം"
     )
     await message.reply_text(text)
@@ -100,15 +100,16 @@ async def ai_handler(client, message):
     query = message.text.split(maxsplit=1)[1]
     status_msg = await message.reply_text("🤖 *Thinking...*")
     
+    url = f"https://text.pollinations.ai/{quote(query)}?model=openai"
+    
     try:
-        url = f"https://text.pollinations.ai/{quote(query)}"
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as session:
             async with session.get(url) as resp:
                 if resp.status == 200:
                     reply = await resp.text()
                     await status_msg.edit_text(reply)
                 else:
-                    await status_msg.edit_text("❌ AI ചിന്തിക്കാൻ അല്പം സമയം എടുക്കുന്നു, വീണ്ടും ശ്രമിക്കൂ.")
+                    await status_msg.edit_text("❌ AI മറുപടി തരാൻ അല്പം വൈകുന്നു. വീണ്ടും ഒരുതവണ കൂടി ശ്രമിക്കൂ!")
     except Exception as e:
         await status_msg.edit_text(f"❌ Error: {str(e)}")
 
