@@ -13,8 +13,13 @@ API_HASH = os.environ.get("API_HASH", "32214e6bfbb651a4f64a707c775eca45")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8926177079:AAH5meh2Kwmk-pb7Mc16lWZ-HfDL1SUEYUk")
 PORT = int(os.environ.get("PORT", "8080"))
 
-# Channel Link for Force Sub
-CHANNEL_LINK = os.environ.get("UPDATE_CHANNEL", "https://t.me/+sRIuDtl2N0gzYWY1")
+# Channel ID for membership checking
+UPDATE_CHANNEL = os.environ.get("UPDATE_CHANNEL", "-1007198656600")
+
+# Private Channel Invite Link for buttons
+CHANNEL_INVITE_LINK = os.environ.get("CHANNEL_INVITE_LINK", "https://t.me/+sRIuDtl2N0gzYWY1")
+if not CHANNEL_INVITE_LINK.startswith("http"):
+    CHANNEL_INVITE_LINK = "https://t.me/+sRIuDtl2N0gzYWY1"
 
 RAW_DOMAIN = os.environ.get("RENDER_EXTERNAL_URL", "https://tg-link-bot-882m.onrender.com")
 if not RAW_DOMAIN.startswith("http"):
@@ -29,17 +34,11 @@ routes = web.RouteTableDef()
 server = web.Application()
 
 async def check_joined(client, user_id):
-    if not CHANNEL_LINK:
+    if not UPDATE_CHANNEL:
         return True
     try:
-        # If link or username provided, try checking member status
-        chat_identifier = CHANNEL_LINK
-        if "t.me/+" in CHANNEL_LINK or "joinchat" in CHANNEL_LINK:
-            # Private channel check
-            chat = await client.get_chat(CHANNEL_LINK)
-            chat_identifier = chat.id
-
-        sub = await client.get_chat_member(chat_identifier, user_id)
+        chat_id = int(UPDATE_CHANNEL) if (UPDATE_CHANNEL.startswith("-100") or UPDATE_CHANNEL.lstrip('-').isdigit()) else UPDATE_CHANNEL
+        sub = await client.get_chat_member(chat_id, user_id)
         if sub.status in ["banned"]:
             return False
         return True
@@ -47,11 +46,11 @@ async def check_joined(client, user_id):
         return False
     except Exception as e:
         print(f"FSUB Check Error: {e}")
-        return True
+        return False
 
 def get_fsub_markup():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("JOIN NOW 🔒", url=CHANNEL_LINK)],
+        [InlineKeyboardButton("JOIN NOW 🔒", url=CHANNEL_INVITE_LINK)],
         [InlineKeyboardButton("✅ I've Joined", callback_data="check_fsub")]
     ])
 
@@ -132,7 +131,7 @@ async def start_cmd(client, message):
             InlineKeyboardButton("Close ❌", callback_data="close_btn")
         ],
         [
-            InlineKeyboardButton("📣 Bot Channel", url=CHANNEL_LINK)
+            InlineKeyboardButton("📣 Bot Channel", url=CHANNEL_INVITE_LINK)
         ]
     ])
     await message.reply_text(text, reply_markup=buttons, disable_web_page_preview=True)
@@ -159,7 +158,7 @@ async def cb_handler(client, query: CallbackQuery):
                     InlineKeyboardButton("Close ❌", callback_data="close_btn")
                 ],
                 [
-                    InlineKeyboardButton("📣 Bot Channel", url=CHANNEL_LINK)
+                    InlineKeyboardButton("📣 Bot Channel", url=CHANNEL_INVITE_LINK)
                 ]
             ])
             await query.message.edit_text(text, reply_markup=buttons, disable_web_page_preview=True)
@@ -189,8 +188,7 @@ async def cb_handler(client, query: CallbackQuery):
             "🤖 **Name:** Public Link Generator Bot\n"
             "🐍 **Language:** Python 3\n"
             "📚 **Framework:** Pyrogram\n"
-            "⚡ **Hosted On:** Render\n"
-            "📢 **Updates Channel:** Join Channel"
+            "⚡ **Hosted On:** Render"
         )
         buttons = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔙 Back", callback_data="back_start"), InlineKeyboardButton("Close ❌", callback_data="close_btn")]
@@ -212,7 +210,7 @@ async def cb_handler(client, query: CallbackQuery):
                 InlineKeyboardButton("Close ❌", callback_data="close_btn")
             ],
             [
-                InlineKeyboardButton("📣 Bot Channel", url=CHANNEL_LINK)
+                InlineKeyboardButton("📣 Bot Channel", url=CHANNEL_INVITE_LINK)
             ]
         ])
         await query.message.edit_text(text, reply_markup=buttons, disable_web_page_preview=True)
@@ -296,7 +294,7 @@ async def handle_file(client, message):
         f"__**Your Fast Link Generated!**__\n\n"
         f"📁 **File Name:**\n`{file_name}`\n\n"
         f"📦 **File Size:** `{file_size}`\n\n"
-        f"For Updates related to bot -> [Join Updates Channel]({CHANNEL_LINK})\n\n"
+        f"For Updates related to bot -> [Join Updates Channel]({CHANNEL_INVITE_LINK})\n\n"
         f"Link Generated Using **Public Link Generator Bot**"
     )
     
