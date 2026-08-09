@@ -11,7 +11,7 @@ except RuntimeError:
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiohttp import web
-import google.generativeai as genai
+from google import genai
 import aiohttp
 
 API_ID = int(os.environ.get("API_ID", "30758714"))
@@ -23,9 +23,9 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 SHORTENER_API = os.environ.get("SHORTENER_API", "")
 SHORTENER_URL = os.environ.get("SHORTENER_URL", "")
 
+ai_client = None
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    ai_model = genai.GenerativeModel('gemini-1.5-flash')
+    ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 RAW_DOMAIN = os.environ.get("RENDER_EXTERNAL_URL", "https://tg-link-bot-882m.onrender.com")
 if not RAW_DOMAIN.startswith("http"):
@@ -105,7 +105,7 @@ async def start_cmd(client, message):
 
 @app.on_message(filters.command("ai") & filters.private)
 async def ai_handler(client, message):
-    if not GEMINI_API_KEY:
+    if not ai_client:
         await message.reply_text("❌ Gemini API Key set ചെയ്തിട്ടില്ല! Render Environment Variables ചെക്ക് ചെയ്യുക.")
         return
 
@@ -117,7 +117,10 @@ async def ai_handler(client, message):
     status_msg = await message.reply_text("🤖 *Thinking...*")
     
     try:
-        response = ai_model.generate_content(query)
+        response = ai_client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=query,
+        )
         await status_msg.edit_text(response.text)
     except Exception as e:
         await status_msg.edit_text(f"❌ Error: {str(e)}")
