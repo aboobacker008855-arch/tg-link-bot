@@ -118,7 +118,7 @@ async def ai_handler(client, message):
     
     try:
         response = ai_client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.0-flash',
             contents=query,
         )
         await status_msg.edit_text(response.text)
