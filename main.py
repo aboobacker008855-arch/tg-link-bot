@@ -206,11 +206,9 @@ async def download_to_disk(bot: Bot, file_id: str, stored_name: str) -> Path:
     await bot.download_file(tg_file.file_path, destination=destination)
     return destination
 
-@dp.message()
+@dp.message(F.document | F.video | F.audio)
 async def process_file(message: Message):
     file_obj = message.document or message.video or message.audio
-    if not file_obj:
-        return
     if file_obj.file_size > MAX_FILE_SIZE_MB * 1024 * 1024:
         await message.answer(f"❌ File is too large. Limit: {MAX_FILE_SIZE_MB} MB.")
         return
