@@ -43,6 +43,7 @@ if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     ai_model = genai.GenerativeModel("gemini-pro")
 
+# ചാനൽ ബട്ടൺ ഒഴിവാക്കിയ സ്റ്റാർട്ട് മെനു
 def start_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -50,9 +51,6 @@ def start_menu():
                 InlineKeyboardButton(text="Help 💡", callback_data="help"),
                 InlineKeyboardButton(text="About ℹ️", callback_data="about"),
                 InlineKeyboardButton(text="Close ❌", callback_data="close")
-            ],
-            [
-                InlineKeyboardButton(text="📢 Bot Channel", url="https://t.me/your_channel_link")
             ]
         ]
     )
@@ -234,7 +232,6 @@ async def process_file(message: Message):
         disable_web_page_preview=True
     )
 
-# Web server to satisfy Render port binding requirement
 async def handle(request):
     return web.Response(text="Bot is running!")
 
