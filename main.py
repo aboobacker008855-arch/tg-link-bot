@@ -13,40 +13,45 @@ API_HASH = os.environ.get("API_HASH", "32214e6bfbb651a4f64a707c775eca45")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8926177079:AAH5meh2Kwmk-pb7Mc16lWZ-HfDL1SUEYUk")
 PORT = int(os.environ.get("PORT", "8080"))
 
-# Force Sub Channel Username (Without @ or with @)
-UPDATE_CHANNEL = os.environ.get("UPDATE_CHANNEL", "myran13")
-
-SHORTENER_API = os.environ.get("SHORTENER_API", "")
-SHORTENER_URL = os.environ.get("SHORTENER_URL", "")
+# Channel Link for Force Sub
+CHANNEL_LINK = os.environ.get("UPDATE_CHANNEL", "https://t.me/+sRIuDtl2N0gzYWY1")
 
 RAW_DOMAIN = os.environ.get("RENDER_EXTERNAL_URL", "https://tg-link-bot-882m.onrender.com")
 if not RAW_DOMAIN.startswith("http"):
     RAW_DOMAIN = f"https://{RAW_DOMAIN}"
 DOMAIN = RAW_DOMAIN.rstrip('/')
 
+SHORTENER_API = os.environ.get("SHORTENER_API", "")
+SHORTENER_URL = os.environ.get("SHORTENER_URL", "")
+
 app = Client("4gb_stream_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 routes = web.RouteTableDef()
 server = web.Application()
 
 async def check_joined(client, user_id):
-    if not UPDATE_CHANNEL:
+    if not CHANNEL_LINK:
         return True
     try:
-        sub = await client.get_chat_member(UPDATE_CHANNEL, user_id)
+        # If link or username provided, try checking member status
+        chat_identifier = CHANNEL_LINK
+        if "t.me/+" in CHANNEL_LINK or "joinchat" in CHANNEL_LINK:
+            # Private channel check
+            chat = await client.get_chat(CHANNEL_LINK)
+            chat_identifier = chat.id
+
+        sub = await client.get_chat_member(chat_identifier, user_id)
         if sub.status in ["banned"]:
             return False
         return True
     except UserNotParticipant:
         return False
-    except Exception:
-        # If bot is not admin or channel invalid, allow user
+    except Exception as e:
+        print(f"FSUB Check Error: {e}")
         return True
 
 def get_fsub_markup():
-    ch_user = UPDATE_CHANNEL.replace('@', '')
-    channel_url = f"https://t.me/{ch_user}"
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("JOIN NOW 🔒", url=channel_url)],
+        [InlineKeyboardButton("JOIN NOW 🔒", url=CHANNEL_LINK)],
         [InlineKeyboardButton("✅ I've Joined", callback_data="check_fsub")]
     ])
 
@@ -120,9 +125,6 @@ async def start_cmd(client, message):
         f"🔞 **Adult content leads to a permanent ban.**"
     )
     
-    ch_user = UPDATE_CHANNEL.replace('@', '')
-    channel_url = f"https://t.me/{ch_user}"
-    
     buttons = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("Help 💡", callback_data="help_btn"),
@@ -130,7 +132,7 @@ async def start_cmd(client, message):
             InlineKeyboardButton("Close ❌", callback_data="close_btn")
         ],
         [
-            InlineKeyboardButton("📣 Bot Channel", url=channel_url)
+            InlineKeyboardButton("📣 Bot Channel", url=CHANNEL_LINK)
         ]
     ])
     await message.reply_text(text, reply_markup=buttons, disable_web_page_preview=True)
@@ -150,8 +152,6 @@ async def cb_handler(client, query: CallbackQuery):
                 f"**WARNING** ⚠️\n"
                 f"🔞 **Adult content leads to a permanent ban.**"
             )
-            ch_user = UPDATE_CHANNEL.replace('@', '')
-            channel_url = f"https://t.me/{ch_user}"
             buttons = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("Help 💡", callback_data="help_btn"),
@@ -159,7 +159,7 @@ async def cb_handler(client, query: CallbackQuery):
                     InlineKeyboardButton("Close ❌", callback_data="close_btn")
                 ],
                 [
-                    InlineKeyboardButton("📣 Bot Channel", url=channel_url)
+                    InlineKeyboardButton("📣 Bot Channel", url=CHANNEL_LINK)
                 ]
             ])
             await query.message.edit_text(text, reply_markup=buttons, disable_web_page_preview=True)
@@ -190,7 +190,7 @@ async def cb_handler(client, query: CallbackQuery):
             "🐍 **Language:** Python 3\n"
             "📚 **Framework:** Pyrogram\n"
             "⚡ **Hosted On:** Render\n"
-            "📢 **Updates Channel:** @myran13"
+            "📢 **Updates Channel:** Join Channel"
         )
         buttons = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔙 Back", callback_data="back_start"), InlineKeyboardButton("Close ❌", callback_data="close_btn")]
@@ -205,8 +205,6 @@ async def cb_handler(client, query: CallbackQuery):
             f"**WARNING** ⚠️\n"
             f"🔞 **Adult content leads to a permanent ban.**"
         )
-        ch_user = UPDATE_CHANNEL.replace('@', '')
-        channel_url = f"https://t.me/{ch_user}"
         buttons = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("Help 💡", callback_data="help_btn"),
@@ -214,7 +212,7 @@ async def cb_handler(client, query: CallbackQuery):
                 InlineKeyboardButton("Close ❌", callback_data="close_btn")
             ],
             [
-                InlineKeyboardButton("📣 Bot Channel", url=channel_url)
+                InlineKeyboardButton("📣 Bot Channel", url=CHANNEL_LINK)
             ]
         ])
         await query.message.edit_text(text, reply_markup=buttons, disable_web_page_preview=True)
@@ -298,8 +296,7 @@ async def handle_file(client, message):
         f"__**Your Fast Link Generated!**__\n\n"
         f"📁 **File Name:**\n`{file_name}`\n\n"
         f"📦 **File Size:** `{file_size}`\n\n"
-        f"For Updates related to bot -> @myran13\n"
-        f"For any query/discussion -> @myran13\n\n"
+        f"For Updates related to bot -> [Join Updates Channel]({CHANNEL_LINK})\n\n"
         f"Link Generated Using **Public Link Generator Bot**"
     )
     
