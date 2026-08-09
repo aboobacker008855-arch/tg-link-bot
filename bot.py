@@ -1,99 +1,84 @@
 import asyncio
+import logging
+from aiogram import Bot, Dispatcher, F, Router
+from aiogram.filters import Command
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties
 import os
-import secrets
 import sqlite3
 from pathlib import Path
 from urllib.parse import quote
+import secrets
 
-import aiofiles
-import requests
-import google.generativeai as genai
-from aiogram import Bot, Dispatcher, F
-from aiogram.filters import Command, CommandStart
-from aiogram.types import CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message
-from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
-import uvicorn
+TOKEN = os.getenv("BOT_TOKEN")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://localhost:8080")
+MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "500"))
 
-load_dotenv()
+STORAGE_DIR = Path("storage")
+STORAGE_DIR.mkdir(exist_ok=True)
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
-CHANNEL_URL = os.getenv("CHANNEL_URL", "https://t.me/")
-STORAGE_DIR = Path(os.getenv("STORAGE_DIR", "./storage"))
-MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "20"))
-ADMIN_IDS = {int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()}
-
-# GEMINI API SETUP
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    ai_model = genai.GenerativeModel('gemini-1.5-flash')
-
-if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN is missing in .env")
-if not PUBLIC_BASE_URL:
-    raise RuntimeError("PUBLIC_BASE_URL is missing in .env")
-
-STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-DB = sqlite3.connect("bot.db", check_same_thread=False)
-DB.execute("""CREATE TABLE IF NOT EXISTS files (
+db_path = Path("bot_database.db")
+db_conn = sqlite3.connect(db_path, check_same_thread=False)
+DB = db_conn.cursor()
+DB.execute("""
+CREATE TABLE IF NOT EXISTS files (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    original_name TEXT NOT NULL,
-    stored_name TEXT NOT NULL UNIQUE,
-    size INTEGER NOT NULL
-)""")
-DB.execute("""CREATE TABLE IF NOT EXISTS users (
-    user_id INTEGER PRIMARY KEY
-)""")
-DB.commit()
+    user_id INTEGER,
+    original_name TEXT,
+    stored_name TEXT,
+    size INTEGER
+)
+""")
+db_conn.commit()
 
-app = FastAPI(title="Telegram Public Link Generator")
-
+bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
+import google.generativeai as genai
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    ai_model = genai.GenerativeModel("gemini-pro")
+
 def menu():
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text="Help", callback_data="help"),
-            InlineKeyboardButton(text="About", callback_data="about"),
-            InlineKeyboardButton(text="Close", callback_data="close"),
-        ],
-        [InlineKeyboardButton(text="📢 Bot Channel", url=CHANNEL_URL)]
-    ])
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="Help 💡", callback_data="help"),
+                InlineKeyboardButton(text="About ℹ️", callback_data="about"),
+                InlineKeyboardButton(text="Close ❌", callback_data="close")
+            ]
+        ]
+    )
 
 def help_text():
     return (
-        "📚 <b>Help & Commands</b>\n\n"
-        "<b>File Features:</b>\n"
-        "• Send file/video -> Direct Stream/Download Link\n"
-        "• /myfiles — Your recent links\n\n"
-        "<b>AI Features:</b>\n"
-        "• /ai [question] — Ask anything to Gemini AI\n"
-        "• /generate [prompt] — Generate HD Images\n\n"
-        f"⚠️ Download limit: {MAX_FILE_SIZE_MB} MB."
+        "📖 <b>Bot Features & Help Menu</b>\n\n"
+        "📁 <b>File Streaming & Downloads:</b>\n"
+        "• എനിക്ക് ഏതെങ്കിലും ഫയലോ വീഡിയോയോ അയച്ചു തരുമ്പോൾ, ഞാൻ Fast Direct Download / Streaming ലിങ്ക് ഉണ്ടാക്കി തരാം!\n\n"
+        "🤖 <b>Free AI Chat:</b>\n"
+        "• /ai [ചോദ്യം] - AI-യോട് എന്തും ചോദിക്കാം.\n\n"
+        "🎨 <b>AI Image Generation:</b>\n"
+        "• /generate [Prompt] - AI ഉപയോഗിച്ച് HD ചിത്രങ്ങൾ ഉണ്ടാക്കാം."
     )
 
 def about_text():
     return (
-        "ℹ️ <b>About</b>\n\n"
-        "All-in-One Telegram Bot: File Streaming, Direct Links & AI Assistant!"
+        "ℹ️ <b>About This Bot</b>\n\n"
+        "I'm Telegram Files Streaming Bot as well as a Direct Links Generator."
     )
 
-@dp.message(CommandStart())
-async def start(message: Message):
-    DB.execute("INSERT OR IGNORE INTO users(user_id) VALUES (?)", (message.from_user.id,))
-    DB.commit()
-    name = message.from_user.first_name or "there"
-    await message.answer(
-        f"👋 Hey, <b>{name}</b>!\n\n"
-        "Welcome to All-in-One Public Link Generator & AI Bot!\n\n"
-        "Send me any file to get a link, or use `/ai [question]` to chat with AI!\n\n"
-        "Click on Help for more info.",
-        reply_markup=menu()
+@dp.message(Command("start"))
+async def start_cmd(message: Message):
+    welcome_text = (
+        f"👋 Hey, <b>{message.from_user.first_name}</b>\n\n"
+        "<i>I'm Telegram Files Streaming Bot as well as a Direct Links Generator</i>\n\n"
+        "Click on Help to get more information\n\n"
+        "WARNING ⚠️\n"
+        "🔞 Adult content leads to a permanent ban."
     )
+    await message.answer(welcome_text, reply_markup=menu())
 
 @dp.message(Command("help"))
 async def help_cmd(message: Message):
@@ -103,18 +88,15 @@ async def help_cmd(message: Message):
 async def about_cmd(message: Message):
     await message.answer(about_text(), reply_markup=menu())
 
-# 🤖 1. AI CHAT FEATURE (/ai command)
 @dp.message(Command("ai"))
 async def ai_chat(message: Message):
     if not GEMINI_API_KEY:
-        await message.answer("❌ Gemini API Key is not set in Render environment variables!")
+        await message.answer("❌ Gemini API Key is not set in Render environment variables.")
         return
-
     text = message.text.split(" ", 1)
     if len(text) < 2:
-        await message.answer("💡 Usage: `/ai What is Python?`", parse_mode="Markdown")
+        await message.answer("💡 Usage: <code>/ai What is Python?</code>")
         return
-
     query = text[1]
     msg = await message.answer("🤖 Thinking...")
     try:
@@ -123,36 +105,31 @@ async def ai_chat(message: Message):
     except Exception as e:
         await msg.edit_text(f"❌ Error: {str(e)}")
 
-# 🎨 2. AI IMAGE GENERATOR FEATURE (/generate command)
 @dp.message(Command("generate"))
 async def generate_image(message: Message):
     text = message.text.split(" ", 1)
     if len(text) < 2:
-        await message.answer("💡 Usage: `/generate a futuristic anime warrior`", parse_mode="Markdown")
+        await message.answer("💡 Usage: <code>/generate a futuristic anime city</code>")
         return
-
     prompt = text[1]
     msg = await message.answer("🎨 Generating image, please wait...")
-    
-    # Pollinations AI API
-    image_url = f"https://image.pollinations.ai/prompt/{quote(prompt)}?width=1024&height=1024&nologo=true"
-    
+    image_url = f"https://image.pollinations.ai/prompt/{quote(prompt)}"
     try:
-        await message.answer_photo(photo=image_url, caption=f"✨ <b>Prompt:</b> {prompt}")
+        await message.answer_photo(photo=image_url, caption=f"✨ Generated for: {prompt}")
         await msg.delete()
     except Exception as e:
-        await msg.edit_text("❌ Failed to generate image. Try another prompt.")
+        await msg.edit_text(f"❌ Failed to generate image. Try another prompt.")
 
 @dp.message(Command("myfiles"))
 async def myfiles(message: Message):
     rows = DB.execute(
-        "SELECT original_name, stored_name, size FROM files WHERE user_id=? ORDER BY id DESC LIMIT 20",
+        "SELECT original_name, stored_name, size FROM files WHERE user_id = ?",
         (message.from_user.id,)
     ).fetchall()
     if not rows:
         await message.answer("You don't have any generated links yet.")
         return
-    lines = ["📂 <b>Your recent files</b>\n"]
+    lines = ["📁 <b>Your recent files</b>\n"]
     for name, stored, size in rows:
         url = f"{PUBLIC_BASE_URL}/d/{quote(stored)}"
         lines.append(f"• {name} — {size/1024/1024:.2f} MB\n{url}")
@@ -160,7 +137,38 @@ async def myfiles(message: Message):
 
 @dp.callback_query(F.data == "help")
 async def help_cb(c: CallbackQuery):
-    await c.message.edit_text(help_text(), reply_markup=menu())
+    help_markup_with_comments = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="💬 Comments", callback_data="bot_comments"),
+                InlineKeyboardButton(text="About ℹ️", callback_data="about"),
+                InlineKeyboardButton(text="Close ❌", callback_data="close")
+            ]
+        ]
+    )
+    await c.message.edit_text(help_text(), reply_markup=help_markup_with_comments)
+    await c.answer()
+
+@dp.callback_query(F.data == "bot_comments")
+async def comments_callback(c: CallbackQuery):
+    comment_text = (
+        "💭 <b>Bot Features & Shortcuts</b>\n\n"
+        "താഴെയുള്ള ബട്ടണുകളിൽ ക്ലിക്ക് ചെയ്താൽ, നേരെ മെസ്സേജ് ടൈപ്പ് ചെയ്യുന്ന സ്ഥലത്ത് കമാൻഡ് ഓട്ടോമാറ്റിക്കായി വരും! 👇"
+    )
+    features_markup = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🤖 Free AI Chat", switch_inline_query_current_chat="/ai ")
+            ],
+            [
+                InlineKeyboardButton(text="🎨 AI Image Generation", switch_inline_query_current_chat="/generate ")
+            ],
+            [
+                InlineKeyboardButton(text="🔙 Back to Help", callback_data="help")
+            ]
+        ]
+    )
+    await c.message.edit_text(text=comment_text, reply_markup=features_markup)
     await c.answer()
 
 @dp.callback_query(F.data == "about")
@@ -173,81 +181,42 @@ async def close_cb(c: CallbackQuery):
     await c.message.delete()
     await c.answer()
 
-async def download_to_disk(bot: Bot, file_id: str, stored_name: str):
+async def download_to_disk(bot: Bot, file_id: str, stored_name: str) -> Path:
     tg_file = await bot.get_file(file_id)
     destination = STORAGE_DIR / stored_name
     await bot.download_file(tg_file.file_path, destination=destination)
     return destination
 
-async def process_file(message: Message, file_id: str, original_name: str, size: int):
-    if size > MAX_FILE_SIZE_MB * 1024 * 1024:
-        await message.answer(
-            f"❌ File is too large. Limit: {MAX_FILE_SIZE_MB} MB."
-        )
+@dp.message()
+async def process_file(message: Message):
+    file_obj = message.document or message.video or message.audio
+    if not file_obj:
         return
-
-    stored = secrets.token_urlsafe(18) + Path(original_name).suffix.lower()
+    if file_obj.file_size > MAX_FILE_SIZE_MB * 1024 * 1024:
+        await message.answer(f"❌ File is too large. Limit: {MAX_FILE_SIZE_MB} MB.")
+        return
+    stored = secrets.token_urlsafe(18) + Path(file_obj.file_name or "file").suffix
     await message.answer("⏳ Upload received. Generating your public link...")
     try:
-        path = await download_to_disk(message.bot, file_id, stored)
+        path = await download_to_disk(message.bot, file_obj.file_id, stored)
     except Exception as e:
         await message.answer("❌ Could not download the file from Telegram.")
-        print("download error:", repr(e))
         return
-
     DB.execute(
-        "INSERT INTO files(user_id, original_name, stored_name, size) VALUES (?,?,?,?)",
-        (message.from_user.id, original_name, stored, size)
+        "INSERT INTO files(user_id, original_name, stored_name, size) VALUES (?, ?, ?, ?)",
+        (message.from_user.id, file_obj.file_name or "file", stored, file_obj.file_size)
     )
-    DB.commit()
+    db_conn.commit()
     url = f"{PUBLIC_BASE_URL}/d/{quote(stored)}"
     await message.answer(
-        "✅ <b>Link generated!</b>\n\n"
-        f"📄 <b>Name:</b> {original_name}\n"
-        f"📦 <b>Size:</b> {size/1024/1024:.2f} MB\n\n"
-        f"🔗 <b>Download:</b>\n{url}",
+        f"✅ <b>Link generated!</b>\n\n"
+        f"📄 <b>Name:</b> {file_obj.file_name or 'file'}\n"
+        f"🔗 <b>Direct Link:</b> {url}",
         disable_web_page_preview=True
     )
 
-@dp.message(F.document)
-async def document_handler(message: Message):
-    d = message.document
-    await process_file(message, d.file_id, d.file_name or "file", d.file_size or 0)
-
-@dp.message(F.video)
-async def video_handler(message: Message):
-    v = message.video
-    await process_file(message, v.file_id, f"video_{v.file_unique_id}.mp4", v.file_size or 0)
-
-@dp.message(F.audio)
-async def audio_handler(message: Message):
-    a = message.audio
-    name = a.file_name or f"audio_{a.file_unique_id}"
-    await process_file(message, a.file_id, name, a.file_size or 0)
-
-@dp.message(F.photo)
-async def photo_handler(message: Message):
-    p = message.photo[-1]
-    await process_file(message, p.file_id, f"photo_{p.file_unique_id}.jpg", p.file_size or 0)
-
-@app.get("/health")
-async def health():
-    return {"ok": True}
-
-@app.get("/d/{stored_name}")
-async def download(stored_name: str):
-    safe = Path(stored_name).name
-    path = STORAGE_DIR / safe
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(path, filename=safe)
-
 async def main():
-    bot = Bot(BOT_TOKEN)
-    config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_level="info")
-    server = uvicorn.Server(config)
-    await asyncio.gather(dp.start_polling(bot), server.serve())
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
-
