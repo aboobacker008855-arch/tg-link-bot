@@ -43,7 +43,7 @@ if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     ai_model = genai.GenerativeModel("gemini-pro")
 
-# ചാനൽ ബട്ടൺ ഒഴിവാക്കിയ സ്റ്റാർട്ട് മെനു
+# നിങ്ങളുടെ സ്വന്തം ചാനൽ ബട്ടൺ ഉൾപ്പെടുത്തിയ സ്റ്റാർട്ട് മെനു
 def start_menu():
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -51,6 +51,9 @@ def start_menu():
                 InlineKeyboardButton(text="Help 💡", callback_data="help"),
                 InlineKeyboardButton(text="About ℹ️", callback_data="about"),
                 InlineKeyboardButton(text="Close ❌", callback_data="close")
+            ],
+            [
+                InlineKeyboardButton(text="📢 Bot Channel", url="https://t.me/linkgenerated")
             ]
         ]
     )
