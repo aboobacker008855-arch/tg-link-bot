@@ -4,13 +4,17 @@ from urllib.parse import quote
 import aiohttp
 
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from pyrogram.errors import UserNotParticipant
 from aiohttp import web
 
 API_ID = int(os.environ.get("API_ID", "30758714"))
 API_HASH = os.environ.get("API_HASH", "32214e6bfbb651a4f64a707c775eca45")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8926177079:AAH5meh2Kwmk-pb7Mc16lWZ-HfDL1SUEYUk")
 PORT = int(os.environ.get("PORT", "8080"))
+
+# Force Sub Channel Username (Without @ or with @)
+UPDATE_CHANNEL = os.environ.get("UPDATE_CHANNEL", "myran13")
 
 SHORTENER_API = os.environ.get("SHORTENER_API", "")
 SHORTENER_URL = os.environ.get("SHORTENER_URL", "")
@@ -23,6 +27,28 @@ DOMAIN = RAW_DOMAIN.rstrip('/')
 app = Client("4gb_stream_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 routes = web.RouteTableDef()
 server = web.Application()
+
+async def check_joined(client, user_id):
+    if not UPDATE_CHANNEL:
+        return True
+    try:
+        sub = await client.get_chat_member(UPDATE_CHANNEL, user_id)
+        if sub.status in ["banned"]:
+            return False
+        return True
+    except UserNotParticipant:
+        return False
+    except Exception:
+        # If bot is not admin or channel invalid, allow user
+        return True
+
+def get_fsub_markup():
+    ch_user = UPDATE_CHANNEL.replace('@', '')
+    channel_url = f"https://t.me/{ch_user}"
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("JOIN NOW 🔒", url=channel_url)],
+        [InlineKeyboardButton("✅ I've Joined", callback_data="check_fsub")]
+    ])
 
 async def get_short_link(long_url):
     if not SHORTENER_API or not SHORTENER_URL:
@@ -81,18 +107,127 @@ async def stream_handler(request):
 
 @app.on_message(filters.command("start") & filters.private)
 async def start_cmd(client, message):
+    user_id = message.from_user.id
+    if not await check_joined(client, user_id):
+        await message.reply_text("JOIN MY UPDATE CHANNEL TO USE ME 🔐", reply_markup=get_fsub_markup())
+        return
+
     text = (
-        "👋 **Public Link Generator & Free AI Bot is Active!**\n\n"
-        "📁 **File Features:**\n"
-        "എനിക്ക് ഏതെങ്കിലും ഫയലോ വീഡിയോയോ അയച്ചു തരൂ, ഞാൻ Fast Stream / Download ലിങ്ക് ഉണ്ടാക്കി തരാം!\n\n"
-        "🤖 **AI Features:**\n"
-        "• `/ai [ചോദ്യം]` - AI-യോട് എന്തും ചോദിക്കാം (Free Fast AI)\n"
-        "• `/generate [image prompt]` - AI ചിത്രങ്ങൾ ഉണ്ടാക്കാം"
+        f"👋 **Hey, {message.from_user.mention}**\n\n"
+        f"__I'm Telegram Files Streaming Bot as well as a Direct Links Generator__\n\n"
+        f"Click on Help to get more information\n\n"
+        f"**WARNING** ⚠️\n"
+        f"🔞 **Adult content leads to a permanent ban.**"
     )
-    await message.reply_text(text)
+    
+    ch_user = UPDATE_CHANNEL.replace('@', '')
+    channel_url = f"https://t.me/{ch_user}"
+    
+    buttons = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("Help 💡", callback_data="help_btn"),
+            InlineKeyboardButton("About ℹ️", callback_data="about_btn"),
+            InlineKeyboardButton("Close ❌", callback_data="close_btn")
+        ],
+        [
+            InlineKeyboardButton("📣 Bot Channel", url=channel_url)
+        ]
+    ])
+    await message.reply_text(text, reply_markup=buttons, disable_web_page_preview=True)
+
+@app.on_callback_query()
+async def cb_handler(client, query: CallbackQuery):
+    data = query.data
+    user_id = query.from_user.id
+
+    if data == "check_fsub":
+        if await check_joined(client, user_id):
+            await query.answer("Thank you for joining! 🎉", show_alert=True)
+            text = (
+                f"👋 **Hey, {query.from_user.mention}**\n\n"
+                f"__I'm Telegram Files Streaming Bot as well as a Direct Links Generator__\n\n"
+                f"Click on Help to get more information\n\n"
+                f"**WARNING** ⚠️\n"
+                f"🔞 **Adult content leads to a permanent ban.**"
+            )
+            ch_user = UPDATE_CHANNEL.replace('@', '')
+            channel_url = f"https://t.me/{ch_user}"
+            buttons = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("Help 💡", callback_data="help_btn"),
+                    InlineKeyboardButton("About ℹ️", callback_data="about_btn"),
+                    InlineKeyboardButton("Close ❌", callback_data="close_btn")
+                ],
+                [
+                    InlineKeyboardButton("📣 Bot Channel", url=channel_url)
+                ]
+            ])
+            await query.message.edit_text(text, reply_markup=buttons, disable_web_page_preview=True)
+        else:
+            await query.answer("❌ You haven't joined the channel yet! Please join first.", show_alert=True)
+
+    elif data == "help_btn":
+        help_text = (
+            "📖 **Bot Features & Help Menu**\n\n"
+            "📁 **File Streaming & Downloads:**\n"
+            "• എനിക്ക് ഏതെങ്കിലും ഫയലോ വീഡിയോയോ അയച്ചു തരൂ, ഞാൻ Fast Direct Download / Streaming ലിങ്ക് ഉണ്ടാക്കി തരാം!\n\n"
+            "🤖 **Free AI Chat:**\n"
+            "• `/ai [ചോദ്യം]` - AI-യോട് എന്തും ചോദിക്കാം.\n"
+            "  __Example:__ `/ai What is Python?`\n\n"
+            "🎨 **AI Image Generation:**\n"
+            "• `/generate [Prompt]` - AI ഉപയോഗിച്ച് HD ചിത്രങ്ങൾ ഉണ്ടാക്കാം.\n"
+            "  __Example:__ `/generate a futuristic anime hero`"
+        )
+        buttons = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 Back", callback_data="back_start"), InlineKeyboardButton("Close ❌", callback_data="close_btn")]
+        ])
+        await query.message.edit_text(help_text, reply_markup=buttons)
+
+    elif data == "about_btn":
+        about_text = (
+            "ℹ️ **About This Bot**\n\n"
+            "🤖 **Name:** Public Link Generator Bot\n"
+            "🐍 **Language:** Python 3\n"
+            "📚 **Framework:** Pyrogram\n"
+            "⚡ **Hosted On:** Render\n"
+            "📢 **Updates Channel:** @myran13"
+        )
+        buttons = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 Back", callback_data="back_start"), InlineKeyboardButton("Close ❌", callback_data="close_btn")]
+        ])
+        await query.message.edit_text(about_text, reply_markup=buttons)
+
+    elif data == "back_start":
+        text = (
+            f"👋 **Hey, {query.from_user.mention}**\n\n"
+            f"__I'm Telegram Files Streaming Bot as well as a Direct Links Generator__\n\n"
+            f"Click on Help to get more information\n\n"
+            f"**WARNING** ⚠️\n"
+            f"🔞 **Adult content leads to a permanent ban.**"
+        )
+        ch_user = UPDATE_CHANNEL.replace('@', '')
+        channel_url = f"https://t.me/{ch_user}"
+        buttons = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("Help 💡", callback_data="help_btn"),
+                InlineKeyboardButton("About ℹ️", callback_data="about_btn"),
+                InlineKeyboardButton("Close ❌", callback_data="close_btn")
+            ],
+            [
+                InlineKeyboardButton("📣 Bot Channel", url=channel_url)
+            ]
+        ])
+        await query.message.edit_text(text, reply_markup=buttons, disable_web_page_preview=True)
+
+    elif data == "close_btn":
+        await query.message.delete()
 
 @app.on_message(filters.command("ai") & filters.private)
 async def ai_handler(client, message):
+    if not await check_joined(client, message.from_user.id):
+        await message.reply_text("JOIN MY UPDATE CHANNEL TO USE ME 🔐", reply_markup=get_fsub_markup())
+        return
+
     if len(message.command) < 2:
         await message.reply_text("💡 **ഉപയോഗിക്കേണ്ട വിധം:** `/ai What is Python?`")
         return
@@ -109,12 +244,16 @@ async def ai_handler(client, message):
                     reply = await resp.text()
                     await status_msg.edit_text(reply)
                 else:
-                    await status_msg.edit_text("❌ AI മറുപടി തരാൻ അല്പം വൈകുന്നു. വീണ്ടും ഒരുതവണ കൂടി ശ്രമിക്കൂ!")
+                    await status_msg.edit_text("❌ AI മറുപടി തരാൻ അല്പം വൈകുന്നു. വീണ്ടും ശ്രമിക്കൂ!")
     except Exception as e:
         await status_msg.edit_text(f"❌ Error: {str(e)}")
 
 @app.on_message(filters.command("generate") & filters.private)
 async def image_handler(client, message):
+    if not await check_joined(client, message.from_user.id):
+        await message.reply_text("JOIN MY UPDATE CHANNEL TO USE ME 🔐", reply_markup=get_fsub_markup())
+        return
+
     if len(message.command) < 2:
         await message.reply_text("💡 **ഉപയോഗിക്കേണ്ട വിധം:** `/generate a futuristic anime hero`")
         return
@@ -132,6 +271,10 @@ async def image_handler(client, message):
 
 @app.on_message(filters.private & (filters.document | filters.video | filters.audio | filters.animation | filters.voice))
 async def handle_file(client, message):
+    if not await check_joined(client, message.from_user.id):
+        await message.reply_text("JOIN MY UPDATE CHANNEL TO USE ME 🔐", reply_markup=get_fsub_markup())
+        return
+
     media = message.document or message.video or message.audio or message.animation or message.voice
     
     status_msg = await message.reply_text("⏳ *Generating High Speed Link...*")
@@ -173,6 +316,9 @@ async def handle_file(client, message):
 
 @app.on_message(filters.private & ~filters.command(["start", "ai", "generate"]))
 async def unknown_msg(client, message):
+    if not await check_joined(client, message.from_user.id):
+        await message.reply_text("JOIN MY UPDATE CHANNEL TO USE ME 🔐", reply_markup=get_fsub_markup())
+        return
     await message.reply_text("❌ ദയവായി ഏതെങ്കിലും **ഫയൽ/വീഡിയോ** അയക്കുക, അല്ലെങ്കിൽ `/ai`, `/generate` ഉപയോഗിക്കുക!")
 
 async def main():
