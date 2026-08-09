@@ -6,6 +6,8 @@ from pathlib import Path
 from urllib.parse import quote
 
 import aiofiles
+import requests
+import google.generativeai as genai
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -22,6 +24,12 @@ CHANNEL_URL = os.getenv("CHANNEL_URL", "https://t.me/")
 STORAGE_DIR = Path(os.getenv("STORAGE_DIR", "./storage"))
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "20"))
 ADMIN_IDS = {int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()}
+
+# GEMINI API SETUP
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    ai_model = genai.GenerativeModel('gemini-1.5-flash')
 
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN is missing in .env")
@@ -58,22 +66,20 @@ def menu():
 
 def help_text():
     return (
-        "📚 <b>Help</b>\n\n"
-        "Send me a document, photo, audio or video. I will save it on the server "
-        "and return an externally downloadable HTTP link.\n\n"
-        "Commands:\n"
-        "• /start — start bot\n"
-        "• /myfiles — your generated links\n"
-        "• /help — help\n"
-        "• /about — about bot\n\n"
-        f"⚠️ Current template download limit: {MAX_FILE_SIZE_MB} MB."
+        "📚 <b>Help & Commands</b>\n\n"
+        "<b>File Features:</b>\n"
+        "• Send file/video -> Direct Stream/Download Link\n"
+        "• /myfiles — Your recent links\n\n"
+        "<b>AI Features:</b>\n"
+        "• /ai [question] — Ask anything to Gemini AI\n"
+        "• /generate [prompt] — Generate HD Images\n\n"
+        f"⚠️ Download limit: {MAX_FILE_SIZE_MB} MB."
     )
 
 def about_text():
     return (
         "ℹ️ <b>About</b>\n\n"
-        "Telegram Files Streaming Bot + Direct Links Generator.\n\n"
-        "Only upload files you own or have permission to distribute."
+        "All-in-One Telegram Bot: File Streaming, Direct Links & AI Assistant!"
     )
 
 @dp.message(CommandStart())
@@ -83,10 +89,9 @@ async def start(message: Message):
     name = message.from_user.first_name or "there"
     await message.answer(
         f"👋 Hey, <b>{name}</b>!\n\n"
-        "I'm a Telegram Files Streaming Bot as well as a Direct Links Generator.\n\n"
-        "Click on Help to get more information.\n\n"
-        "⚠️ <b>WARNING</b>\n"
-        "🔞 Adult content is not supported in this template.",
+        "Welcome to All-in-One Public Link Generator & AI Bot!\n\n"
+        "Send me any file to get a link, or use `/ai [question]` to chat with AI!\n\n"
+        "Click on Help for more info.",
         reply_markup=menu()
     )
 
@@ -97,6 +102,46 @@ async def help_cmd(message: Message):
 @dp.message(Command("about"))
 async def about_cmd(message: Message):
     await message.answer(about_text(), reply_markup=menu())
+
+# 🤖 1. AI CHAT FEATURE (/ai command)
+@dp.message(Command("ai"))
+async def ai_chat(message: Message):
+    if not GEMINI_API_KEY:
+        await message.answer("❌ Gemini API Key is not set in Render environment variables!")
+        return
+
+    text = message.text.split(" ", 1)
+    if len(text) < 2:
+        await message.answer("💡 Usage: `/ai What is Python?`", parse_mode="Markdown")
+        return
+
+    query = text[1]
+    msg = await message.answer("🤖 Thinking...")
+    try:
+        response = ai_model.generate_content(query)
+        await msg.edit_text(response.text)
+    except Exception as e:
+        await msg.edit_text(f"❌ Error: {str(e)}")
+
+# 🎨 2. AI IMAGE GENERATOR FEATURE (/generate command)
+@dp.message(Command("generate"))
+async def generate_image(message: Message):
+    text = message.text.split(" ", 1)
+    if len(text) < 2:
+        await message.answer("💡 Usage: `/generate a futuristic anime warrior`", parse_mode="Markdown")
+        return
+
+    prompt = text[1]
+    msg = await message.answer("🎨 Generating image, please wait...")
+    
+    # Pollinations AI API
+    image_url = f"https://image.pollinations.ai/prompt/{quote(prompt)}?width=1024&height=1024&nologo=true"
+    
+    try:
+        await message.answer_photo(photo=image_url, caption=f"✨ <b>Prompt:</b> {prompt}")
+        await msg.delete()
+    except Exception as e:
+        await msg.edit_text("❌ Failed to generate image. Try another prompt.")
 
 @dp.message(Command("myfiles"))
 async def myfiles(message: Message):
@@ -137,7 +182,7 @@ async def download_to_disk(bot: Bot, file_id: str, stored_name: str):
 async def process_file(message: Message, file_id: str, original_name: str, size: int):
     if size > MAX_FILE_SIZE_MB * 1024 * 1024:
         await message.answer(
-            f"❌ File is too large for this template. Limit: {MAX_FILE_SIZE_MB} MB."
+            f"❌ File is too large. Limit: {MAX_FILE_SIZE_MB} MB."
         )
         return
 
@@ -146,7 +191,7 @@ async def process_file(message: Message, file_id: str, original_name: str, size:
     try:
         path = await download_to_disk(message.bot, file_id, stored)
     except Exception as e:
-        await message.answer("❌ Could not download the file from Telegram. Check the server/Bot API setup.")
+        await message.answer("❌ Could not download the file from Telegram.")
         print("download error:", repr(e))
         return
 
@@ -191,7 +236,6 @@ async def health():
 
 @app.get("/d/{stored_name}")
 async def download(stored_name: str):
-    # Prevent path traversal.
     safe = Path(stored_name).name
     path = STORAGE_DIR / safe
     if not path.is_file():
@@ -206,3 +250,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
