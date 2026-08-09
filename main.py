@@ -13,10 +13,7 @@ API_HASH = os.environ.get("API_HASH", "32214e6bfbb651a4f64a707c775eca45")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8926177079:AAH5meh2Kwmk-pb7Mc16lWZ-HfDL1SUEYUk")
 PORT = int(os.environ.get("PORT", "8080"))
 
-# Channel ID for membership checking
 UPDATE_CHANNEL = os.environ.get("UPDATE_CHANNEL", "-1007198656600")
-
-# Private Channel Invite Link for buttons
 CHANNEL_INVITE_LINK = os.environ.get("CHANNEL_INVITE_LINK", "https://t.me/+sRIuDtl2N0gzYWY1")
 if not CHANNEL_INVITE_LINK.startswith("http"):
     CHANNEL_INVITE_LINK = "https://t.me/+sRIuDtl2N0gzYWY1"
@@ -39,16 +36,17 @@ async def check_joined(client, user_id):
     try:
         raw_ch = str(UPDATE_CHANNEL).strip()
         chat_id = int(raw_ch) if (raw_ch.startswith("-100") or raw_ch.lstrip('-').isdigit()) else raw_ch
+        
         sub = await client.get_chat_member(chat_id, user_id)
-        if sub.status in ["banned", "left"]:
+        if sub.status in ["banned", "left", "kicked"]:
             return False
         return True
     except UserNotParticipant:
         return False
     except Exception as e:
         print(f"FSUB Check Error: {e}")
-        # Bot is not admin or valid error -> fallback to allow user
-        return True
+        # If any unexpected error occurs, safely treat as not joined to enforce sub
+        return False
 
 def get_fsub_markup():
     return InlineKeyboardMarkup([
