@@ -1,4 +1,12 @@
+aiogram
+google-generativeai
 pyrogram
 tgcrypto
 aiohttp
+aiosignal
+attrs
+frozenlist
+idna
+multidict
 requests
+yarl
